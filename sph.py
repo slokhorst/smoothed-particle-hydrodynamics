@@ -8,9 +8,12 @@ class SPHSim:
 	N = 100
 	rho0 = 1
 	C = 0.45
-	dt = 0.2
-	D = 20
-	mu = 1
+	dt = 0.01
+	D = 10
+	mu = 10
+	G = 10
+	mass = 1
+	interaction_interval = 10
 
 	kernel_density_const =  315/(64*np.pi*h**9)
 	gradkernel_pressure_const = -6 * 315/(64*np.pi*h**9)
@@ -35,24 +38,48 @@ class SPHSim:
 
 	def body_force(self, r):
 		f = np.array([0.0,0.0,0.0])
-		#f[2] -= 1 #gravity
+		f[2] -= self.G #gravity
 		return f
 
+	def update_interacting_particles(self):
+	    v_max_sq = 0
+	    for i in range(0, self.N):
+	    	v_max_sq = max(v_max_sq,np.sum(np.square(self.pos[i,:])))
+
+	    cutoff_sq = self.interaction_interval*self.interaction_interval*self.dt*self.dt*v_max_sq
+
+	    self.interacting = np.zeros((self.N,self.N))
+	    for i in range(0, self.N):
+	        for j in range(i+1, self.N):
+	            dr_sq = np.sum(np.square(self.pos[i,:]-self.pos[j,:]))
+
+	            if dr_sq < cutoff_sq:
+	                self.interacting[i,j] = 1
+	                self.interacting[j,i] = 1
+
+	def save_pos(self, filename):
+		np.savetxt(filename,self.pos,delimiter=',',newline=',\n')
 
 	def __init__(self):
-		self.pos = np.random.uniform(low=-10.0, high=10.0, size=(self.N,3))
-		self.vel = np.random.uniform(low=-10.0, high=10.0, size=(self.N,3))
+		self.it = 0
+		self.pos = np.random.uniform(low=-self.D, high=self.D, size=(self.N,3))
+		#self.vel = np.random.uniform(low=-10.0, high=10.0, size=(self.N,3))
+		self.vel = np.zeros(shape=(self.N,3))
 		self.acc = np.zeros(shape=(self.N,3))
-		self.mass = np.ndarray([self.N])
 		self.rho = np.ndarray([self.N])
 		self.P = np.ndarray([self.N])
 
-		self.mass[:] = 1
 		for i in range(0,self.N):
 			self.rho[i] = self.density(self.pos[i,:])
 		self.P[:] = self.pressure(self.rho)
 
+		self.update_interacting_particles()
+
 	def update(self):
+		self.it += 1
+		if self.it%self.interaction_interval == 0:
+			self.update_interacting_particles()
+
 		self.vel += 0.5*self.acc*self.dt
 		self.pos += self.vel*self.dt
 
@@ -60,31 +87,31 @@ class SPHSim:
 
 		self.acc[:,:] = 0
 		for i in range(0,self.N):
-			self.acc[i,:] = 0
-			for j in range(0,self.N):
-				dr = self.pos[i,:]-self.pos[j,:]
-				dr_len = np.sqrt(np.sum(np.square(dr)))
-				if dr_len > self.h:
-					continue
-				self.acc[i,:] += -self.mass[j]*((self.P[i]/self.rho[i]**2)+(self.P[j]/self.rho[j]**2))*self.gradkernel_pressure(dr_len,dr)
-				#self.acc[i,:] += -self.mu*((self.vel[j]/self.rho[j]**2)-(self.vel[i]/self.rho[i]**2))*self.grad2kernel_viscosity(dr_len)
+			for j in np.nonzero(self.interacting[i,:])[0]:
+				if j > i:
+					dr = self.pos[i,:]-self.pos[j,:]
+					dr_len = np.sqrt(np.sum(np.square(dr)))
+					if dr_len > self.h:
+						continue
+					acc_P_i = -self.mass*((self.P[i]/self.rho[i]**2)+(self.P[j]/self.rho[j]**2))*self.gradkernel_pressure(dr_len,dr)
+					acc_mu_i = +self.mu*((self.vel[j]/self.rho[j]**2)-(self.vel[i]/self.rho[i]**2))*self.grad2kernel_viscosity(dr_len)
+					acc_i = acc_P_i + acc_mu_i
+					acc_j = -acc_i
+					self.acc[i,:] += acc_i
+					self.acc[j,:] += acc_j
 			self.acc[i,:] += self.body_force(self.pos[i,:])
 
 		self.vel += 0.5*self.acc*self.dt
-
 
 		for i in range(0,self.N):
 			self.rho[i] = self.density(self.pos[i,:])
 		self.P[:] = self.pressure(self.rho)
 
-		print("total mass:",np.sum(self.rho))
-		print("total velocity:",np.sum(np.absolute(self.vel)))
-
 
 sph = SPHSim()
 
-#ascat = anim_md.AnimatedScatter(sph.pos, 100, sph.update)
-#ascat.show()
-
-for i in range(0,100):
+for i in range(0,10000):
+	print(i)
 	sph.update()
+
+sph.save_pos('posdata')

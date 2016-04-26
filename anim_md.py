@@ -16,9 +16,9 @@ class AnimatedScatter(object):
     def setup(self):
         self.scat = self.ax.scatter(self.pos[:,0],self.pos[:,1],self.pos[:,2])
         self.scat._offsets3d = np.transpose(self.pos)
-        self.ax.set_xlim(-self.domain/2, self.domain/2)
-        self.ax.set_ylim(-self.domain/2, self.domain/2)
-        self.ax.set_zlim(-self.domain/2, self.domain/2)
+        self.ax.set_xlim(-self.domain, self.domain)
+        self.ax.set_ylim(-self.domain, self.domain)
+        self.ax.set_zlim(-self.domain, self.domain)
         return self.scat,
 
     def update(self, i):
