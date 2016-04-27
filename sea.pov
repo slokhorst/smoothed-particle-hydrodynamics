@@ -92,7 +92,7 @@ union{
   #while (defined(MyFile))
     #read (MyFile,Val1,Val3,Val2)
 
-    sphere{<0.1*Val1,0.1*(Val2+10),0.1*Val3>,0.1  
+    sphere{<0.1*Val1,0.1*(Val2+10),0.1*Val3>,0.08  
         material{
          texture{
           pigment{ rgbf<.93,.95,.98,0.9>*0.95}
