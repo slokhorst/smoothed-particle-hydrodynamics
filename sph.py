@@ -1,16 +1,17 @@
 import numpy as np
 import numpy.random
 import anim_md
+import os
 
 class SPHSim:
 	gamma = 7
 	h = 1
-	N = 100
+	N = 1000
 	rho0 = 1
 	C = 0.45
 	dt = 0.01
-	D = 10
-	mu = 10
+	D = 7
+	mu = 1
 	G = 10
 	mass = 1
 	interaction_interval = 10
@@ -84,6 +85,7 @@ class SPHSim:
 		self.pos += self.vel*self.dt
 
 		self.vel *= 1-2*(np.absolute(self.pos)>self.D)
+		self.pos[:] = np.clip(self.pos,-self.D,self.D)
 
 		self.acc[:,:] = 0
 		for i in range(0,self.N):
@@ -110,8 +112,12 @@ class SPHSim:
 
 sph = SPHSim()
 
-for i in range(0,10000):
+# ani = anim_md.AnimatedScatter(sph.pos, sph.D, sph.update)
+# ani.show()
+
+os.makedirs('data',exist_ok=True)
+for i in range(0,1000):
 	print(i)
 	sph.update()
-
-sph.save_pos('posdata')
+	if i%10 == 0:
+		sph.save_pos('data/posdata{:03d}.csv'.format(round(i/10)))
