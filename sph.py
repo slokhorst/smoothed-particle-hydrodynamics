@@ -5,6 +5,7 @@ import os
 
 class SPHSim:
 	gamma = 7
+	gamma_surf = 4
 	h = 1
 	N = 1000
 	rho0 = 1
@@ -29,6 +30,12 @@ class SPHSim:
 
 	def grad2kernel_viscosity(self, dr_len):
 		return (dr_len < self.h) * self.grad2kernel_viscosity_const * (self.h - dr_len)
+
+	def normal_vec(self, dr_len, dr):
+		return (dr_len < self.h) * dr * self.gradkernel_pressure_const* (self.h**2 - dr_len**2)**2
+
+	def div_normal_vec(self, dr_len):
+		return (dr_len < self.h) * self.kernel_density_const*(self.h**2-dr_len**2)*(24*dr_len**2-18*(self.h**2-dr_len**2))
 
 	def density(self, r):
 		dr_len = np.sqrt(np.sum(np.square(r-self.pos),axis=1))
@@ -95,9 +102,14 @@ class SPHSim:
 					dr_len = np.sqrt(np.sum(np.square(dr)))
 					if dr_len > self.h:
 						continue
+					acc_s = 0
+					n = self.normal_vec(dr_len,dr)
+					len_n = np.sqrt(np.sum(np.square(n)))
 					acc_P_i = -self.mass*((self.P[i]/self.rho[i]**2)+(self.P[j]/self.rho[j]**2))*self.gradkernel_pressure(dr_len,dr)
 					acc_mu_i = +self.mu*((self.vel[j]/self.rho[j]**2)-(self.vel[i]/self.rho[i]**2))*self.grad2kernel_viscosity(dr_len)
-					acc_i = acc_P_i + acc_mu_i
+					if len_n > 0:
+						acc_s = +self.gamma_surf*(self.div_normal_vec(dr_len)*n/len_n)
+					acc_i = acc_P_i + acc_mu_i+acc_s
 					acc_j = -acc_i
 					self.acc[i,:] += acc_i
 					self.acc[j,:] += acc_j
@@ -112,8 +124,8 @@ class SPHSim:
 
 sph = SPHSim()
 
-# ani = anim_md.AnimatedScatter(sph.pos, sph.D, sph.update)
-# ani.show()
+ani = anim_md.AnimatedScatter(sph.pos, sph.D, sph.update)
+ani.show()
 
 os.makedirs('data',exist_ok=True)
 for i in range(0,1000):
