@@ -73,6 +73,11 @@ class SPHSim:
 					ds_sq = np.sum(np.square(self.vel[i,:]*self.dt + 0.5*self.acc[i,:]*self.dt**2))
 					if isec and (d)**2 < 2*ds_sq:
 						self.vel[i,:] = self.vel[i,:] - (2-self.damping)*(np.sum(self.vel[i,:]*geo.n))*geo.n
+					# dirty hack! push particles away if they're close to tri,
+					# so they don't go through them
+					isec, d = triangle_intersection(geo.v1, geo.v2, geo.v3, self.pos[i,:], -geo.n)
+					if isec and d < 0.1:
+						self.vel[i,:] += geo.n
 				if type(geo) == Sphere:
 					dr = self.pos[i,:]-geo.r0
 					dr_len = np.sqrt(np.sum(np.square(dr)))
