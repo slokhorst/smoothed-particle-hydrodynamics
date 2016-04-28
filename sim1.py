@@ -25,6 +25,11 @@ for x in np.linspace(-D,D,num=nx):
 sph.vel = np.random.uniform(low=-1, high=1, size=(N,3))
 
 ani = anim_md.AnimatedScatter(sph.pos, D, sph.update)
+for geo in sph.geometry:
+	if type(geo) == Sphere:
+		ani.add_sphere(geo)
+	if type(geo) == Triangle:
+		ani.add_triangle(geo)
 ani.show()
 
 # os.makedirs('data',exist_ok=True)
