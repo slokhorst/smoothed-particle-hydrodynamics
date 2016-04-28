@@ -23,7 +23,7 @@ global_settings{ assumed_gamma 1.0 }
 
 //------------------------------------------------------------------------
 #declare Camera_0 = camera {/*ultra_wide_angle*/ angle 15      // front view
-                            location  <0.0 , 1.0 ,-40.0>
+                            location  <0 , 10.0 ,-40>
                             right     x*image_width/image_height
                             look_at   <0.0 , 1.0 , 0.0>}
 #declare Camera_1 = camera {/*ultra_wide_angle*/ angle 90 // diagonal view
@@ -35,10 +35,10 @@ global_settings{ assumed_gamma 1.0 }
                             right     x*image_width/image_height
                             look_at   <0.0 , 1.0 , 0.0>}
 #declare Camera_3 = camera {/*ultra_wide_angle*/ angle 90        // top view
-                            location  <0.0 , 3.0 ,-0.001>
+                            location  <0.0 , 10.0 ,0>
                             right     x*image_width/image_height
                             look_at   <0.0 , 1.0 , 0.0>}
-camera{Camera_1}
+camera{Camera_0}
 //------------------------------------------------------------------------
 // sun -------------------------------------------------------------------
 light_source{<-1500,2500,-2500> color White*0.9 }
@@ -78,6 +78,31 @@ plane { <0,1,0>, 0    // plane with layered textures
         texture { Raster(RasterScale,RasterHalfLineZ) rotate<0,90,0>}
         rotate<0,0,0>
       }
+// Tri angle prism
+prism{ -3, 3, 4
+      < 0, 0 >,
+      < 3, 0>,
+      < 3, 3>,
+      < 0, 0>
+      
+      texture{
+      pigment{color Pink}
+      finish {ambient 0.15
+            diffuse 0.85}
+      }
+      rotate<-90,0,0>
+      translate<-1.5,0,0>
+      }
+// Sphere in the middle of way
+sphere{ <-1.5, 0, 0>, 2
+    texture{
+    pigment{color White}
+    finish {ambient 0.15
+            diffuse 0.85}
+           }
+           } 
+      
+
 //------------------------------------------------ end of squared plane XZ
 
 //--------------------------------------------------------------------------
@@ -92,7 +117,7 @@ union{
   #while (defined(MyFile))
     #read (MyFile,Val1,Val3,Val2)
 
-    sphere{<0.1*Val1,0.1*(Val2+10),0.1*Val3>,0.08  
+    sphere{<Val1,Val2+3,Val3>,0.08  
         material{
          texture{
           pigment{ rgbf<.93,.95,.98,0.9>*0.95}
