@@ -26,7 +26,7 @@ class AnimatedScatter(object):
         self.ax.set_zlim(-self.domain, self.domain)
         #sphere
         R = 2
-        r0 = np.array([0.0,-self.domain/2,-self.domain])
+        r0 = np.array([0.0,-self.domain,-self.domain])
         u = np.linspace(0, 2 * np.pi, 100)
         v = np.linspace(0, np.pi, 100)
         x = R*np.outer(np.cos(u), np.sin(v)) + r0[0]

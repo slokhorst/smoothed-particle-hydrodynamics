@@ -1,7 +1,4 @@
 import numpy as np
-import numpy.random
-import anim_md
-import os
 from ray_tri_isec import triangle_intersection, triangle_normal
 
 class Triangle:
@@ -19,18 +16,15 @@ class Sphere:
 
 class SPHSim:
 	gamma = 7
-	gamma_surf = 1
+	sigma = 1
 	h = 1
-	nx = 1*8
-	nb = 0*2
-	N = int(0.25*nx**3) + nb**3
 	rho0 = 1
 	C = 0.45
 	dt = 0.01
-	D = 1*3
 	mu = 1
 	G = 10
 	mass = 1
+	damping = 0.0
 	interaction_interval = 10
 
 	kernel_density_const =  315/(64*np.pi*h**9)
@@ -67,7 +61,7 @@ class SPHSim:
 
 	def boundary_interaction(self):
 		# make sure the particles stay in the box
-		self.vel *= 1-2*(np.absolute(self.pos)>self.D)
+		self.vel *= 1-(2-self.damping)*(np.absolute(self.pos)>self.D)
 		self.pos[:] = np.clip(self.pos,-self.D,self.D)
 
 		# handle collisions with objects
@@ -76,14 +70,15 @@ class SPHSim:
 				if type(geo) == Triangle:
 					direction = self.vel[i,:]/np.sqrt(np.sum(np.square(self.vel[i,:])))
 					isec, d = triangle_intersection(geo.v1, geo.v2, geo.v3 ,self.pos[i,:],direction)
-					if isec and d < 0.1:
-						self.vel[i,:] = self.vel[i,:] - 2*(np.sum(self.vel[i,:]*geo.n))*geo.n
+					ds_sq = np.sum(np.square(self.vel[i,:]*self.dt + 0.5*self.acc[i,:]*self.dt**2))
+					if isec and (d)**2 < 2*ds_sq:
+						self.vel[i,:] = self.vel[i,:] - (2-self.damping)*(np.sum(self.vel[i,:]*geo.n))*geo.n
 				if type(geo) == Sphere:
 					dr = self.pos[i,:]-geo.r0
 					dr_len = np.sqrt(np.sum(np.square(dr)))
 					if dr_len < geo.R:
 						n = -dr/dr_len
-						self.vel[i,:] = self.vel[i,:] - 2*(np.sum(self.vel[i,:]*n))*n		
+						self.vel[i,:] = self.vel[i,:] - (2-self.damping)*(np.sum(self.vel[i,:]*n))*n		
 
 	def update_interacting_particles(self):
 		v_max_sq = np.max(np.sum(np.square(self.vel),axis=1))
@@ -98,53 +93,29 @@ class SPHSim:
 					self.interacting[j,i] = 1
 
 	def save_pos(self, filename):
-		np.savetxt(filename,self.pos,delimiter=',',newline=',\n')
+		np.savetxt(filename,self.pos/self.D,delimiter=',',newline=',\n')
 
-	def __init__(self):
+	def __init__(self, N, D):
+		self.N = N
+		self.D = D
 		self.it = 0
 		self.vel = np.zeros(shape=(self.N,3))
 		self.pos = np.zeros(shape=(self.N,3))
-		i = 0
-		for x in np.linspace(-self.D,self.D,num=self.nx):
-			for z in np.linspace(0.1,self.D,num=self.nx):
-				for y in np.linspace(+self.D,+self.D/2,num=self.nx/4):
-					self.pos[i,0] =x
-					self.pos[i,1] =y
-					self.pos[i,2] =z
-					i +=1
-		for x in np.linspace(-0.25*self.D,0.25*self.D,num=self.nb):
-			for y in np.linspace(-0.25*self.D,0.25*self.D,num=self.nb):
-				for z in np.linspace(0.5*self.D,1.0*self.D,num=self.nb):
-					self.pos[i,0] =x
-					self.pos[i,1] =y
-					self.pos[i,2] =z
-					i +=1
-		self.vel = np.random.uniform(low=-1, high=1, size=(self.N,3))
 		self.acc = np.zeros(shape=(self.N,3))
 		self.rho = np.ndarray([self.N])
 		self.P = np.ndarray([self.N])
+		self.geometry = []
 
-		self.geometry = np.array([
-			Sphere([0.0,-self.D/2,-self.D],2.0),
-			Triangle([self.D,0.0,-self.D], [-self.D,0.0,-self.D], [self.D,self.D,0.0]),
-			Triangle([-self.D,self.D,0], [-self.D,0.0,-self.D], [self.D,self.D,0.0]),
-		])
+	def update(self):
+		if self.it%self.interaction_interval == 0:
+			self.update_interacting_particles()
 
 		for i in range(0,self.N):
 			self.rho[i] = self.density(self.pos[i,:])
 		self.P[:] = self.pressure(self.rho)
 
-		self.update_interacting_particles()
-
-	def update(self):
-		self.it += 1
-		if self.it%self.interaction_interval == 0:
-			self.update_interacting_particles()
-
 		self.vel += 0.5*self.acc*self.dt
 		self.pos += self.vel*self.dt
-
-		self.boundary_interaction()
 
 		self.acc[:,:] = 0
 		for i in range(0,self.N):
@@ -160,7 +131,7 @@ class SPHSim:
 					acc_P_i = -self.mass*((self.P[i]/self.rho[i]**2)+(self.P[j]/self.rho[j]**2))*self.gradkernel_pressure(dr_len,dr)
 					acc_mu_i = +self.mu*((self.vel[j]/self.rho[j]**2)-(self.vel[i]/self.rho[i]**2))*self.grad2kernel_viscosity(dr_len)
 					if len_n > 0:
-						acc_s = +self.gamma_surf*(self.div_normal_vec(dr_len)*n/len_n)
+						acc_s = +self.sigma*(self.div_normal_vec(dr_len)*n/len_n)
 					acc_i = acc_P_i + acc_mu_i+acc_s
 					acc_j = -acc_i
 					self.acc[i,:] += acc_i
@@ -169,19 +140,6 @@ class SPHSim:
 
 		self.vel += 0.5*self.acc*self.dt
 
-		for i in range(0,self.N):
-			self.rho[i] = self.density(self.pos[i,:])
-		self.P[:] = self.pressure(self.rho)
+		self.boundary_interaction()
 
-
-sph = SPHSim()
-
-ani = anim_md.AnimatedScatter(sph.pos, sph.D, sph.update)
-ani.show()
-
-# os.makedirs('data',exist_ok=True)
-# for i in range(0,1000):
-# 	print(i)
-# 	sph.update()
-# 	if i%10 == 0:
-# 		sph.save_pos('data/posdata{:03d}.csv'.format(round(i/10)))
+		self.it += 1
